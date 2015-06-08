@@ -1,0 +1,76 @@
+version = '1.0.0'
+buildscript {
+    repositories {
+        mavenCentral()
+        maven {
+            url "https://oss.sonatype.org/content/repositories/snapshots/"
+        }
+        maven {
+            url "http://techshroom.github.io/downloads/maven"
+        }
+    }
+    
+    configurations.all {
+        resolutionStrategy {
+            cacheChangingModulesFor 0, 'seconds'
+        }
+    }
+    dependencies {
+        classpath group: 'com.techshroom', name: 'Aversion', version: '1.0.1-SNAPSHOT'
+    }
+}
+
+version = rootProject.version
+
+apply plugin: 'java'
+apply plugin: 'eclipse'
+apply plugin: 'aversion-util'
+apply plugin: 'aversion-maven'
+apply plugin: 'aversion-apt'
+
+util {
+    javaVersion = '1.7'
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        url "https://oss.sonatype.org/content/repositories/snapshots/"
+    }
+}
+configurations.all {
+   resolutionStrategy {
+     // fail eagerly on version conflict (includes transitive dependencies)
+     // e.g. multiple different versions of the same dependency (group and name are equal)
+     failOnVersionConflict()
+
+     // force certain versions of dependencies (including transitive)
+     force 'com.google.auto.service:auto-service:1.0-SNAPSHOT', 'com.google.guava:guava:18.0',
+           'com.google.dagger:dagger:2.0', 'com.google.auto:auto-common:0.4'
+
+     cacheDynamicVersionsFor 10, 'minutes'
+     // don't cache changing modules at all
+     cacheChangingModulesFor 0, 'seconds'
+   }
+}
+ 
+dependencies {
+    compile group: 'org.apache.logging.log4j', name: 'log4j-core', version: '2.0.2'
+    compile group: 'org.apache.logging.log4j', name: 'log4j-api', version: '2.0.2'
+    compile group: 'net.sf.jopt-simple', name: 'jopt-simple', version: '4.7'
+    addAPTReqWComp group: 'com.google.guava', name: 'guava', version: '18.0'
+    addAPT group: 'com.google.auto.value', name: 'auto-value', version: '1.2-SNAPSHOT'
+    addAPTReq name: 'aopalliance'
+    addAPTReq name: 'asm'
+    addAPTReq name: 'auto-value'
+    addAPTReq name: 'auto-common'
+    addAPTReq name: 'cglib'
+    addAPTReq name: 'commons-collections'
+    addAPTReq name: 'commons-lang'
+    addAPTReq name: 'dagger'
+    addAPTReq name: 'javawriter'
+    addAPTReq name: 'javax.inject'
+    addAPTReq name: 'velocity'
+
+    testCompile group: 'junit', name: 'junit', version: '4.+'
+}

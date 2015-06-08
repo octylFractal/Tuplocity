@@ -1,0 +1,26 @@
+# package
+*.jar
+
+# eclipse
+.classpath
+.project
+.metadata/
+.settings/
+.recommenders/
+bin/
+
+# (no) idea
+.idea
+*.iml
+
+# gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# custom
+.build/
+*.log*
+.apt_generated
+
+*.factorypath
