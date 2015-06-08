@@ -59,6 +59,7 @@ dependencies {
     compile group: 'org.apache.logging.log4j', name: 'log4j-api', version: '2.0.2'
     compile group: 'net.sf.jopt-simple', name: 'jopt-simple', version: '4.7'
     addAPTReqWComp group: 'com.google.guava', name: 'guava', version: '18.0'
+        compile group: 'com.squareup', name: 'javapoet', version: '1.2.0-SNAPSHOT'
     addAPT group: 'com.google.auto.value', name: 'auto-value', version: '1.2-SNAPSHOT'
     addAPTReq name: 'aopalliance'
     addAPTReq name: 'asm'
