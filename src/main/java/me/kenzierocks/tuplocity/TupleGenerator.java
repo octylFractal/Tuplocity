@@ -25,7 +25,7 @@ public class TupleGenerator {
                 String.format(String.format("%%0%dd", String.valueOf(max)
                         .length()), tuple);
         String pkg = "";
-        for (int i = 0; i < pkgbase.length(); i++) {
+        for (int i = 0; i < pkgbase.length() - 1; i++) {
             pkg += ".$" + pkgbase.charAt(i);
         }
         return PACKAGE + pkg;
