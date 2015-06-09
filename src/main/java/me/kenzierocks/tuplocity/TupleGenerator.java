@@ -3,20 +3,13 @@ package me.kenzierocks.tuplocity;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import javax.lang.model.element.Modifier;
 
 import com.google.common.base.MoreObjects;
-import com.squareup.javapoet.ClassName;
-import com.squareup.javapoet.CodeBlock;
-import com.squareup.javapoet.JavaFile;
-import com.squareup.javapoet.MethodSpec;
-import com.squareup.javapoet.ParameterizedTypeName;
-import com.squareup.javapoet.TypeName;
-import com.squareup.javapoet.TypeSpec;
-import com.squareup.javapoet.TypeVariableName;
-import com.squareup.javapoet.WildcardTypeName;
+import com.squareup.javapoet.*;
 
 public class TupleGenerator {
 
@@ -45,83 +38,62 @@ public class TupleGenerator {
     }
 
     public void generateTupleFiles() {
+        ClassName tupleInterface = ClassName.get(PACKAGE, "Tuple");
+        generateTupleInterface(tupleInterface);
         for (int i = 1; i <= this.count; i++) {
+            System.err.println("Generating " + getPackage(this.count, i)
+                    + ".Tuple" + i);
             TypeSpec.Builder spec = TypeSpec.classBuilder("Tuple" + i);
             spec.addModifiers(Modifier.PUBLIC, Modifier.FINAL);
             MethodSpec.Builder cons = MethodSpec.constructorBuilder();
             cons.addModifiers(Modifier.PUBLIC);
             List<TypeVariableName> ptVars = new ArrayList<>(i);
-            List<TypeVariableName> ptVarsMerged = new ArrayList<>(i);
+            for (int j = 1; j <= i; j++) {
+                ptVars.add(TypeVariableName.get("$" + j));
+            }
             ClassName className =
                     ClassName.get(getPackage(this.count, i), "Tuple" + i);
             if (i != 1) {
-                int thisIndex = 1;
                 int halfway = i / 2;
                 int rest = i - halfway;
-                System.err.println(MoreObjects.toStringHelper(this).add("i", i)
-                        .add("halfway", halfway).add("rest", rest).toString());
-                for (int m = 1; m <= halfway; m++, thisIndex++) {
-                    TypeVariableName typeVar =
-                            TypeVariableName.get("$" + thisIndex);
-                    ptVars.add(typeVar);
-                    cons.addCode(CodeBlock
-                            .builder()
-                            .addStatement("this.item$L = firstHalf.getItem$L()",
-                                          thisIndex,
-                                          m).build());
-                }
-                ClassName classNameH =
-                        ClassName.get(getPackage(this.count, halfway), "Tuple"
-                                + halfway);
-                ParameterizedTypeName typeH =
-                        ParameterizedTypeName.get(classNameH, ptVars
-                                .toArray(EMPTY_TYPENAME_ARRAY));
-                cons.addParameter(typeH, "firstHalf");
-                ptVarsMerged.addAll(ptVars);
-                ptVars.clear();
-                for (int m = 1; m <= rest; m++, thisIndex++) {
-                    TypeVariableName typeVar =
-                            TypeVariableName.get("$" + thisIndex);
-                    ptVars.add(typeVar);
-                    cons.addCode(CodeBlock
-                            .builder()
-                            .addStatement("this.item$L = secondHalf.getItem$L()",
-                                          thisIndex,
-                                          m).build());
-                }
-                ClassName classNameR =
-                        ClassName.get(getPackage(this.count, rest), "Tuple"
-                                + rest);
-                ParameterizedTypeName typeR =
-                        ParameterizedTypeName.get(classNameR, ptVars
-                                .toArray(EMPTY_TYPENAME_ARRAY));
-                cons.addParameter(typeR, "secondHalf");
-                ptVarsMerged.addAll(ptVars);
-                ptVars.clear();
+                setupHalf(cons, ptVars, halfway, 0, halfway, "firstHalf");
+                setupHalf(cons, ptVars, rest, halfway, i, "secondHalf");
             } else {
-                ptVarsMerged.add(TypeVariableName.get("$" + i));
-                cons.addParameter(TypeVariableName.get("$" + i), "item" + i);
+                cons.addParameter(ptVars.get(0), "item" + i);
                 cons.addCode(CodeBlock.builder()
-                        .addStatement("this.item$L = item$L", i, i).build());
+                        .addStatement("this.items[$L] = item$L", i - 1, i)
+                        .build());
             }
-            TypeName[] typeVars = ptVarsMerged.toArray(EMPTY_TYPENAME_ARRAY);
-            spec.addTypeVariables(ptVarsMerged);
-            for (int thisIndex = 1; thisIndex <= typeVars.length; thisIndex++) {
-                TypeName typeVar = typeVars[thisIndex - 1];
+            spec.addTypeVariables(ptVars);
+            for (int j = 0; j < ptVars.size(); j++) {
+                TypeName typeVar = ptVars.get(j);
                 MethodSpec.Builder mSpec =
-                        MethodSpec.methodBuilder("getItem" + thisIndex);
+                        MethodSpec.methodBuilder("getItem" + (j + 1));
+                mSpec.addAnnotation(AnnotationSpec
+                        .builder(SuppressWarnings.class)
+                        .addMember("value", "$S", "unchecked").build());
                 mSpec.addModifiers(Modifier.PUBLIC);
                 mSpec.returns(typeVar);
                 mSpec.addCode(CodeBlock.builder()
-                        .addStatement("return this.item$L", thisIndex).build());
+                        .addStatement("return ($T) this.items[$L]", typeVar, j)
+                        .build());
                 spec.addMethod(mSpec.build());
-                spec.addField(typeVar,
-                              "item" + thisIndex,
-                              Modifier.PRIVATE,
-                              Modifier.FINAL);
             }
+            spec.addSuperinterface(tupleInterface);
+            spec.addMethod(MethodSpec.methodBuilder("toArray")
+                    .addAnnotation(Override.class)
+                    .addModifiers(Modifier.PUBLIC).returns(Object[].class)
+                    .addCode("return this.items.clone();\n").build());
+            FieldSpec.Builder items =
+                    FieldSpec.builder(Object[].class,
+                                      "items",
+                                      Modifier.PRIVATE,
+                                      Modifier.FINAL);
+            items.initializer("new Object[$L]", i);
+            spec.addField(items.build());
             ParameterizedTypeName type =
-                    ParameterizedTypeName.get(className, typeVars);
+                    ParameterizedTypeName.get(className, ptVars
+                            .toArray(EMPTY_TYPENAME_ARRAY));
             spec.addMethod(cons.build());
             spec.addMethod(makeEquals(i, type));
             spec.addMethod(makeHashCode(i, type));
@@ -134,6 +106,42 @@ public class TupleGenerator {
             } catch (IOException e) {
                 e.printStackTrace();
             }
+        }
+    }
+
+    private void setupHalf(MethodSpec.Builder cons,
+            List<TypeVariableName> ptVars, int tupleSize, int start, int end,
+            String halfName) {
+        cons.addStatement("$T.arraycopy($L.toArray(), 0, this.items, $L, $L)",
+                          System.class,
+                          halfName,
+                          start,
+                          end);
+        ClassName classNameH =
+                ClassName.get(getPackage(this.count, tupleSize), "Tuple"
+                        + tupleSize);
+        ParameterizedTypeName typeH =
+                ParameterizedTypeName.get(classNameH, ptVars
+                        .subList(start, end).toArray(EMPTY_TYPENAME_ARRAY));
+        cons.addParameter(typeH, halfName);
+    }
+
+    private void generateTupleInterface(ClassName tupleInterface) {
+        TypeSpec tupleSpec =
+                TypeSpec.interfaceBuilder(tupleInterface.simpleName())
+                        .addModifiers(Modifier.PUBLIC)
+                        .addMethod(MethodSpec
+                                .methodBuilder("toArray")
+                                .addModifiers(Modifier.PUBLIC,
+                                              Modifier.ABSTRACT)
+                                .returns(Object[].class).build()).build();
+        JavaFile file =
+                JavaFile.builder(PACKAGE, tupleSpec).skipJavaLangImports(true)
+                        .indent("    ").build();
+        try {
+            file.writeTo(Paths.get("src/main/java"));
+        } catch (IOException e) {
+            e.printStackTrace();
         }
     }
 
@@ -156,25 +164,14 @@ public class TupleGenerator {
         ParameterizedTypeName wildType =
                 ParameterizedTypeName.get(type.rawType, typeNames);
         block.addStatement("$T otherT = ($T) other", wildType, wildType);
-        for (int m = 1; m <= i; m++) {
-            block.beginControlFlow("if (!(this.$L == otherT.$L || "
-                                           + "(this.$L != null && this.$L.equals(otherT.$L))))",
-                                   "item" + m,
-                                   "item" + m,
-                                   "item" + m,
-                                   "item" + m,
-                                   "item" + m);
-            block.addStatement("return false");
-            block.endControlFlow();
-        }
-        block.addStatement("return true");
+
+        block.addStatement("return $T.deepEquals(this.items, otherT.items)",
+                           Arrays.class);
         block.endControlFlow();
         block.addStatement("return false");
         spec.addCode(block.build());
         return spec.build();
     }
-
-    private static final int GOOD_HASHCODE_MULTIPLIER = 1000003;
 
     private MethodSpec makeHashCode(int i, ParameterizedTypeName type) {
         MethodSpec.Builder spec = MethodSpec.methodBuilder("hashCode");
@@ -182,14 +179,7 @@ public class TupleGenerator {
         spec.addModifiers(Modifier.PUBLIC);
         spec.returns(int.class);
         CodeBlock.Builder block = CodeBlock.builder();
-        block.addStatement("int h = 1");
-        for (int m = 1; m <= i; m++) {
-            block.addStatement("h *= $L", GOOD_HASHCODE_MULTIPLIER);
-            block.addStatement("h ^= $L == null ? 0 : $L.hashCode()",
-                               "this.item" + m,
-                               "this.item" + m);
-        }
-        block.addStatement("return h");
+        block.addStatement("return $T.deepHashCode(this.items)", Arrays.class);
         spec.addCode(block.build());
         return spec.build();
     }
@@ -200,28 +190,8 @@ public class TupleGenerator {
         spec.addModifiers(Modifier.PUBLIC);
         spec.returns(String.class);
         CodeBlock.Builder block = CodeBlock.builder();
-        block.addStatement("$T str = new $T($S)",
-                           StringBuilder.class,
-                           StringBuilder.class,
-                           "(");
-        block.add("str");
-        for (int m = 1; m <= i; m++) {
-            block.add(".append(this.item$L)", m);
-            if (m < i) {
-                block.add(".append($S)", ",");
-                block.add("\n");
-                if (m == 1) {
-                    block.indent();
-                }
-            } else {
-                block.add(";\n");
-                if (i != 1) {
-                    block.unindent();
-                }
-            }
-        }
-        block.addStatement("str.append($S)", ")");
-        block.addStatement("return str.toString()");
+        block.addStatement("return $T.toString(this.items)"
+                + ".replace('[', '(').replace(']', ')')", Arrays.class);
         spec.addCode(block.build());
         return spec.build();
     }
