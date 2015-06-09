@@ -9,7 +9,6 @@ import javax.lang.model.element.Modifier;
 
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.CodeBlock;
-import com.squareup.javapoet.FieldSpec;
 import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.ParameterizedTypeName;
@@ -20,6 +19,17 @@ import com.squareup.javapoet.TypeVariableName;
 public class TupleGenerator {
 
     private static final String PACKAGE = "me.kenzierocks.tuplocity.tuples";
+
+    private static String getPackage(int max, int tuple) {
+        String pkgbase = String.format(String.format("%%0%dd", max), tuple);
+        System.err.println(String.format("%%0%dd", max));
+        String pkg = "";
+        for (int i = 0; i < pkgbase.length(); i++) {
+            pkg += ".$" + pkgbase.charAt(i);
+        }
+        return PACKAGE + pkg;
+    }
+
     private final int count;
 
     public TupleGenerator(int count) {
@@ -61,7 +71,9 @@ public class TupleGenerator {
                 }
             }
             if (i > 1) {
-                ClassName className = ClassName.get(PACKAGE, "Tuple" + (i - 1));
+                ClassName className =
+                        ClassName.get(getPackage(this.count, i - 1), "Tuple"
+                                + (i - 1));
                 ParameterizedTypeName type =
                         ParameterizedTypeName.get(className, ptVars
                                 .toArray(new TypeName[0]));
@@ -72,7 +84,7 @@ public class TupleGenerator {
                     .addStatement("this.item$L = item$L", i, i).build());
             spec.addMethod(cons.build());
             JavaFile file =
-                    JavaFile.builder(PACKAGE, spec.build())
+                    JavaFile.builder(getPackage(this.count, i), spec.build())
                             .skipJavaLangImports(true).indent("    ").build();
             try {
                 file.writeTo(Paths.get("src/main/java"));
