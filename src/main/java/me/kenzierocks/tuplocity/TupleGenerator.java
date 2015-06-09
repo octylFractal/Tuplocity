@@ -7,7 +7,6 @@ import java.util.List;
 
 import javax.lang.model.element.Modifier;
 
-import com.google.common.base.Objects;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.CodeBlock;
 import com.squareup.javapoet.JavaFile;
