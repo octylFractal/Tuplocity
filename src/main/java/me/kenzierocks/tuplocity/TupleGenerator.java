@@ -21,8 +21,9 @@ public class TupleGenerator {
     private static final String PACKAGE = "me.kenzierocks.tuplocity.tuples";
 
     private static String getPackage(int max, int tuple) {
-        String pkgbase = String.format(String.format("%%0%dd", max), tuple);
-        System.err.println(String.format("%%0%dd", max));
+        String pkgbase =
+                String.format(String.format("%%0%dd", String.valueOf(max)
+                        .length()), tuple);
         String pkg = "";
         for (int i = 0; i < pkgbase.length(); i++) {
             pkg += ".$" + pkgbase.charAt(i);
