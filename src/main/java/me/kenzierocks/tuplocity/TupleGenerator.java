@@ -9,10 +9,28 @@ import java.util.List;
 import javax.lang.model.element.Modifier;
 
 import com.google.common.base.MoreObjects;
+import com.google.common.collect.ImmutableList;
 import com.squareup.javapoet.*;
 
 public class TupleGenerator {
-
+    private static final List<String> KEYWORDS;
+    static {
+        // @formatter:off
+        // underscore + false/true/null are special
+        KEYWORDS =
+                ImmutableList.of("_", "abstract", "assert",
+                        "boolean", "break", "byte", "case", "catch", "char",
+                        "class", "const", "continue", "default", "do",
+                        "double", "else", "extends", "false", "final",
+                        "finally", "float", "for", "goto", "if", "implements",
+                        "import", "instanceof", "int", "interface", "long",
+                        "native", "new", "null", "package", "private",
+                        "protected", "public", "return", "short", "static",
+                        "strictfp", "super", "switch", "synchronized", "this",
+                        "throw", "throws", "transient", "true", "try", "void",
+                        "volatile", "while");
+        // @formatter:on
+    }
     private static final TypeName[] EMPTY_TYPENAME_ARRAY = new TypeName[0];
     private static final String PACKAGE = "me.kenzierocks.tuplocity.tuples";
     private static final String TUPLE_ITEMS_FIELD_NAME = "i";
@@ -84,8 +102,14 @@ public class TupleGenerator {
             MethodSpec.Builder cons = MethodSpec.constructorBuilder();
             cons.addModifiers(Modifier.PUBLIC);
             List<TypeVariableName> ptVars = new ArrayList<>(i);
-            for (int j = 0; j < i; j++) {
-                ptVars.add(TypeVariableName.get(convertToTypeVariable(j)));
+            for (int j = 0, typeVarCounter = 0; j < i; j++, typeVarCounter++) {
+                String name = convertToTypeVariable(typeVarCounter);
+                if (KEYWORDS.contains(name)) {
+                    // skip keywords
+                    j--;
+                    continue;
+                }
+                ptVars.add(TypeVariableName.get(name));
             }
             ClassName className =
                     ClassName.get(getPackage(this.count, i), "Tuple" + i);
