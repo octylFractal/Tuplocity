@@ -122,7 +122,7 @@ public class TupleGenerator {
                 cons.addParameter(ptVars.get(0), "item" + i);
                 cons.addCode(CodeBlock
                         .builder()
-                        .addStatement("this.$L[$L] = item$L",
+                        .addStatement("$L[$L] = item$L",
                                       TUPLE_ITEMS_FIELD_NAME,
                                       i - 1,
                                       i).build());
@@ -139,7 +139,7 @@ public class TupleGenerator {
                 mSpec.returns(typeVar);
                 mSpec.addCode(CodeBlock
                         .builder()
-                        .addStatement("return($T)this.$L[$L]",
+                        .addStatement("return($T)$L[$L]",
                                       typeVar,
                                       TUPLE_ITEMS_FIELD_NAME,
                                       j).build());
@@ -151,7 +151,7 @@ public class TupleGenerator {
                     .addAnnotation(Override.class)
                     .addModifiers(Modifier.PUBLIC)
                     .returns(Object[].class)
-                    .addCode("return this.$L.clone();\n",
+                    .addCode("return $L.clone();\n",
                              TUPLE_ITEMS_FIELD_NAME).build());
             FieldSpec.Builder items =
                     FieldSpec.builder(Object[].class,
@@ -181,7 +181,7 @@ public class TupleGenerator {
     private void setupHalf(MethodSpec.Builder cons,
             List<TypeVariableName> ptVars, int tupleSize, int start, int end,
             String halfName) {
-        cons.addStatement("$T.arraycopy($L.toArray(),0,this.$L,$L,$L)",
+        cons.addStatement("$T.arraycopy($L.toArray(),0,$L,$L,$L)",
                           System.class,
                           halfName,
                           TUPLE_ITEMS_FIELD_NAME,
@@ -225,7 +225,7 @@ public class TupleGenerator {
         spec.addParameter(Object.class, "other");
         CodeBlock.Builder block = CodeBlock.builder();
         block.addStatement("return other==this||"
-                                   + "other instanceof $T&&$T.deepEquals(this.$L,(($T)other).$L)",
+                                   + "other instanceof $T&&$T.deepEquals($L,(($T)other).$L)",
                            type.rawType,
                            Arrays.class,
                            TUPLE_ITEMS_FIELD_NAME,
@@ -241,7 +241,7 @@ public class TupleGenerator {
         spec.addModifiers(Modifier.PUBLIC);
         spec.returns(int.class);
         CodeBlock.Builder block = CodeBlock.builder();
-        block.addStatement("return $T.deepHashCode(this.$L)",
+        block.addStatement("return $T.deepHashCode($L)",
                            Arrays.class,
                            TUPLE_ITEMS_FIELD_NAME);
         spec.addCode(block.build());
@@ -254,7 +254,7 @@ public class TupleGenerator {
         spec.addModifiers(Modifier.PUBLIC);
         spec.returns(String.class);
         CodeBlock.Builder block = CodeBlock.builder();
-        block.addStatement("$T str=$T.toString(this.$L)",
+        block.addStatement("$T str=$T.toString($L)",
                            String.class,
                            Arrays.class,
                            TUPLE_ITEMS_FIELD_NAME);
