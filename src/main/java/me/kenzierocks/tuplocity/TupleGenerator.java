@@ -52,6 +52,10 @@ public class TupleGenerator {
         List<Character> listA = new ArrayList<>();
         List<Character> listB = new ArrayList<>();
         for (char i = 0; i <= 127; i++) {
+            if (i == '_') {
+                // just no
+                continue;
+            }
             if (Character.isJavaIdentifierStart(i)) {
                 listA.add(i);
             }
