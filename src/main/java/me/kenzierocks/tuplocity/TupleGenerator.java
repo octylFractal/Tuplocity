@@ -15,6 +15,7 @@ public class TupleGenerator {
 
     private static final TypeName[] EMPTY_TYPENAME_ARRAY = new TypeName[0];
     private static final String PACKAGE = "me.kenzierocks.tuplocity.tuples";
+    private static final String TUPLE_ITEMS_FIELD_NAME = "i";
 
     private static String getPackage(int max, int tuple) {
         String pkgbase =
@@ -25,6 +26,41 @@ public class TupleGenerator {
             pkg += ".$" + pkgbase.charAt(i);
         }
         return PACKAGE + pkg;
+    }
+
+    private static final char[] FIRST_CHARACTERS;
+    private static final char[] REST_CHARACTERS;
+    static {
+        List<Character> listA = new ArrayList<>();
+        List<Character> listB = new ArrayList<>();
+        for (char i = 0; i <= 127; i++) {
+            if (Character.isJavaIdentifierStart(i)) {
+                listA.add(i);
+            }
+            if (Character.isJavaIdentifierPart(i)) {
+                listB.add(i);
+            }
+        }
+        FIRST_CHARACTERS = new char[listA.size()];
+        REST_CHARACTERS = new char[listB.size()];
+        for (int i = 0; i < FIRST_CHARACTERS.length; i++) {
+            FIRST_CHARACTERS[i] = listA.get(i);
+        }
+        for (int i = 0; i < REST_CHARACTERS.length; i++) {
+            REST_CHARACTERS[i] = listB.get(i);
+        }
+    }
+
+    private static String convertToTypeVariable(int i) {
+        String s = "";
+        while (i >= FIRST_CHARACTERS.length) {
+            s += REST_CHARACTERS[i % REST_CHARACTERS.length];
+            i /= REST_CHARACTERS.length;
+        }
+        if (i >= 0) {
+            s = FIRST_CHARACTERS[i] + s;
+        }
+        return s;
     }
 
     private final int count;
@@ -48,8 +84,8 @@ public class TupleGenerator {
             MethodSpec.Builder cons = MethodSpec.constructorBuilder();
             cons.addModifiers(Modifier.PUBLIC);
             List<TypeVariableName> ptVars = new ArrayList<>(i);
-            for (int j = 1; j <= i; j++) {
-                ptVars.add(TypeVariableName.get("$" + j));
+            for (int j = 0; j < i; j++) {
+                ptVars.add(TypeVariableName.get(convertToTypeVariable(j)));
             }
             ClassName className =
                     ClassName.get(getPackage(this.count, i), "Tuple" + i);
@@ -57,36 +93,45 @@ public class TupleGenerator {
                 int halfway = i / 2;
                 int rest = i - halfway;
                 setupHalf(cons, ptVars, halfway, 0, halfway, "firstHalf");
-                setupHalf(cons, ptVars, rest, halfway, i, "secondHalf");
+                setupHalf(cons, ptVars, rest, halfway, halfway, "secondHalf");
             } else {
                 cons.addParameter(ptVars.get(0), "item" + i);
-                cons.addCode(CodeBlock.builder()
-                        .addStatement("this.items[$L] = item$L", i - 1, i)
-                        .build());
+                cons.addCode(CodeBlock
+                        .builder()
+                        .addStatement("this.$L[$L] = item$L",
+                                      TUPLE_ITEMS_FIELD_NAME,
+                                      i - 1,
+                                      i).build());
             }
             spec.addTypeVariables(ptVars);
+            spec.addAnnotation(AnnotationSpec.builder(SuppressWarnings.class)
+                    .addMember("value", "$S", "unchecked")
+                    .addMember("value", "$S", "rawtypes").build());
             for (int j = 0; j < ptVars.size(); j++) {
                 TypeName typeVar = ptVars.get(j);
                 MethodSpec.Builder mSpec =
                         MethodSpec.methodBuilder("getItem" + (j + 1));
-                mSpec.addAnnotation(AnnotationSpec
-                        .builder(SuppressWarnings.class)
-                        .addMember("value", "$S", "unchecked").build());
                 mSpec.addModifiers(Modifier.PUBLIC);
                 mSpec.returns(typeVar);
-                mSpec.addCode(CodeBlock.builder()
-                        .addStatement("return ($T) this.items[$L]", typeVar, j)
-                        .build());
+                mSpec.addCode(CodeBlock
+                        .builder()
+                        .addStatement("return($T)this.$L[$L]",
+                                      typeVar,
+                                      TUPLE_ITEMS_FIELD_NAME,
+                                      j).build());
                 spec.addMethod(mSpec.build());
             }
             spec.addSuperinterface(tupleInterface);
-            spec.addMethod(MethodSpec.methodBuilder("toArray")
+            spec.addMethod(MethodSpec
+                    .methodBuilder("toArray")
                     .addAnnotation(Override.class)
-                    .addModifiers(Modifier.PUBLIC).returns(Object[].class)
-                    .addCode("return this.items.clone();\n").build());
+                    .addModifiers(Modifier.PUBLIC)
+                    .returns(Object[].class)
+                    .addCode("return this.$L.clone();\n",
+                             TUPLE_ITEMS_FIELD_NAME).build());
             FieldSpec.Builder items =
                     FieldSpec.builder(Object[].class,
-                                      "items",
+                                      TUPLE_ITEMS_FIELD_NAME,
                                       Modifier.PRIVATE,
                                       Modifier.FINAL);
             items.initializer("new Object[$L]", i);
@@ -100,7 +145,7 @@ public class TupleGenerator {
             spec.addMethod(makeToString(i, type));
             JavaFile file =
                     JavaFile.builder(getPackage(this.count, i), spec.build())
-                            .skipJavaLangImports(true).indent("    ").build();
+                            .skipJavaLangImports(true).indent("").build();
             try {
                 file.writeTo(Paths.get("src/main/java"));
             } catch (IOException e) {
@@ -112,17 +157,20 @@ public class TupleGenerator {
     private void setupHalf(MethodSpec.Builder cons,
             List<TypeVariableName> ptVars, int tupleSize, int start, int end,
             String halfName) {
-        cons.addStatement("$T.arraycopy($L.toArray(), 0, this.items, $L, $L)",
+        cons.addStatement("$T.arraycopy($L.toArray(),0,this.$L,$L,$L)",
                           System.class,
                           halfName,
+                          TUPLE_ITEMS_FIELD_NAME,
                           start,
                           end);
         ClassName classNameH =
                 ClassName.get(getPackage(this.count, tupleSize), "Tuple"
                         + tupleSize);
         ParameterizedTypeName typeH =
-                ParameterizedTypeName.get(classNameH, ptVars
-                        .subList(start, end).toArray(EMPTY_TYPENAME_ARRAY));
+                ParameterizedTypeName
+                        .get(classNameH,
+                             ptVars.subList(start, start + tupleSize)
+                                     .toArray(EMPTY_TYPENAME_ARRAY));
         cons.addParameter(typeH, halfName);
     }
 
@@ -137,7 +185,7 @@ public class TupleGenerator {
                                 .returns(Object[].class).build()).build();
         JavaFile file =
                 JavaFile.builder(PACKAGE, tupleSpec).skipJavaLangImports(true)
-                        .indent("    ").build();
+                        .indent("").build();
         try {
             file.writeTo(Paths.get("src/main/java"));
         } catch (IOException e) {
@@ -152,23 +200,13 @@ public class TupleGenerator {
         spec.returns(boolean.class);
         spec.addParameter(Object.class, "other");
         CodeBlock.Builder block = CodeBlock.builder();
-        block.beginControlFlow("if (other == this)");
-        block.addStatement("return true");
-        block.endControlFlow();
-        block.beginControlFlow("if (other instanceof $T)", type.rawType);
-        // block.add("@$T($S)\n", SuppressWarnings.class, "unchecked");
-        TypeName[] typeNames = type.typeArguments.toArray(EMPTY_TYPENAME_ARRAY);
-        for (int j = 0; j < typeNames.length; j++) {
-            typeNames[j] = WildcardTypeName.subtypeOf(Object.class);
-        }
-        ParameterizedTypeName wildType =
-                ParameterizedTypeName.get(type.rawType, typeNames);
-        block.addStatement("$T otherT = ($T) other", wildType, wildType);
-
-        block.addStatement("return $T.deepEquals(this.items, otherT.items)",
-                           Arrays.class);
-        block.endControlFlow();
-        block.addStatement("return false");
+        block.addStatement("return other==this||"
+                                   + "other instanceof $T&&$T.deepEquals(this.$L,(($T)other).$L)",
+                           type.rawType,
+                           Arrays.class,
+                           TUPLE_ITEMS_FIELD_NAME,
+                           type.rawType,
+                           TUPLE_ITEMS_FIELD_NAME);
         spec.addCode(block.build());
         return spec.build();
     }
@@ -179,7 +217,9 @@ public class TupleGenerator {
         spec.addModifiers(Modifier.PUBLIC);
         spec.returns(int.class);
         CodeBlock.Builder block = CodeBlock.builder();
-        block.addStatement("return $T.deepHashCode(this.items)", Arrays.class);
+        block.addStatement("return $T.deepHashCode(this.$L)",
+                           Arrays.class,
+                           TUPLE_ITEMS_FIELD_NAME);
         spec.addCode(block.build());
         return spec.build();
     }
@@ -190,8 +230,11 @@ public class TupleGenerator {
         spec.addModifiers(Modifier.PUBLIC);
         spec.returns(String.class);
         CodeBlock.Builder block = CodeBlock.builder();
-        block.addStatement("return $T.toString(this.items)"
-                + ".replace('[', '(').replace(']', ')')", Arrays.class);
+        block.addStatement("$T str=$T.toString(this.$L)",
+                           String.class,
+                           Arrays.class,
+                           TUPLE_ITEMS_FIELD_NAME);
+        block.addStatement("return '('+str.substring(1,str.length()-1)+')'");
         spec.addCode(block.build());
         return spec.build();
     }
